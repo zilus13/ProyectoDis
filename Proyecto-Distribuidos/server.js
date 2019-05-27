@@ -1,7 +1,9 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const request = require("request-promise");
+const getJSON = require('get-json')
 const app = express();
+const fs = require('fs');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -35,11 +37,33 @@ var tiendas_conectadas = [{
      nombre_tienda: 'Tienda3',
      puerto: '3000'
 }];
+var clientes_compra = [];
 
+function guardar() {
+     request.post('http://localhost:4000/Backup', {
+          json: {
+               datos_tienda,
+               tiendas_conectadas,
+               clientes_compra
+          }
+     }, (error, res, body) => {
+          if (error) {
+               console.error(error)
+               return
+          }
+          console.log(`statusCode: ${res.statusCode}`)
+          console.log(body)
+     })
+}
 
 //Enpoint para mostrar datos de la tienda
 app.get('/Mostrar_Tienda', function (req, res) {
      res.send(datos_tienda);
+});
+
+//Enpoint para mostrar registro de compras
+app.get('/Mostrar_Compras', function (req, res) {
+     res.send(clientes_compra);
 });
 
 // Endpoint para Modificar productos
@@ -54,16 +78,36 @@ app.post('/Modificar-Productos', function (req, res) {
                datos_tienda.productos[index].precio = monto;
           }
      }
-
+     guardar()
      res.send(datos_tienda);
 })
 
 //Endpoint para Agregar productos
-app.post('/Agregar-productos', function (req, res) {
+app.post('/Agregar-productos', async (req, res) => {
 
      let producto = req.body;
-
      datos_tienda.productos.push(producto);
+     guardar()
+     res.send(datos_tienda);
+});
+//Endpoint para Agregar compra por cliente 
+app.post('/compra', function (req, res) {
+
+     let compra = req.body;
+     let producto_comprado = compra.nombre_produto;
+     let cantidad_comprada = compra.cantidad;
+
+     for (let index = 0; index < datos_tienda.productos.length; index++) {
+          if (datos_tienda.productos[index].nombre == producto_comprado) {
+               if ((datos_tienda.productos[index].cantidad - cantidad_comprada) >= 0) {
+                    datos_tienda.productos[index].cantidad = datos_tienda.productos[index].cantidad - cantidad_comprada;
+               }
+
+          }
+
+     }
+     clientes_compra.push(compra);
+     guardar()
      res.send(datos_tienda);
 })
 
@@ -78,7 +122,7 @@ app.post('/Eliminar-Producto', (req, res) => {
 
           }
      }
-
+     guardar()
      res.send(datos_tienda);
 
 });
@@ -90,6 +134,7 @@ app.post('/Agregar-Tiendas', function (req, res) {
 
      tiendas_conectadas.push(tienda);
      res.send(tiendas_conectadas);
+     guardar()
 });
 
 //Endpoint para eliminar tiendas
@@ -107,7 +152,7 @@ app.post('/eliminar-Tiendas-no-conectadas', function (req, res) {
 
           }
      }
-
+     guardar()
      res.send(tiendas_conectadas);
 });
 
@@ -117,7 +162,7 @@ app.get('/confirmar-conexion', function (req, res) {
      let verificar = {
           status: true
      };
-
+     guardar()
      res.send(verificar);
 });
 
@@ -160,7 +205,7 @@ app.get('/confirmar-conexion-tiendas', async (req, res) => {
           bandera++;
      }
 
-
+     guardar()
      res.send(tiendas_conectadas);
 });
 
@@ -213,7 +258,7 @@ app.get('/Total-tiendas', async (req, res) => {
                console.log('respuesta de error::: ', err);
           })
      }
-
+     guardar()
      res.send({ total_tiendas: suma });
 
 });
